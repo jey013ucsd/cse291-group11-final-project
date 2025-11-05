@@ -1,0 +1,3 @@
+dataset_name: "hf-vision/chest-xray-pneumonia"
+target_dir: "dataset"
+IMG_SIZE: 128
