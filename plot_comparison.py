@@ -132,7 +132,6 @@ def plot_combined_metrics(experiments, output_path):
     
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
     
-    # FID scores
     colors1 = plt.cm.viridis(np.linspace(0, 1, len(exp_names)))
     bars1 = ax1.bar(range(len(exp_names)), fid_scores, color=colors1, alpha=0.8, edgecolor='black')
     ax1.set_ylabel('FID Score (lower is better)', fontsize=12, fontweight='bold')
@@ -146,7 +145,6 @@ def plot_combined_metrics(experiments, output_path):
         ax1.text(bar.get_x() + bar.get_width()/2., height,
                 f'{score:.2f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
     
-    # Inception scores
     colors2 = plt.cm.plasma(np.linspace(0, 1, len(exp_names)))
     bars2 = ax2.bar(range(len(exp_names)), is_means, color=colors2, alpha=0.8, edgecolor='black')
     ax2.set_xlabel('Experiment', fontsize=12, fontweight='bold')
@@ -283,7 +281,6 @@ def plot_client_scaling(experiments, output_path):
         print("Not enough client scaling experiments found")
         return
     
-    # Sort by number of clients
     sorted_exps = sorted(client_exps.items(), key=lambda x: int(x[0].split()[0]))
     labels = [k for k, v in sorted_exps]
     fid_scores = [v['fid_score'] for k, v in sorted_exps]
@@ -291,7 +288,6 @@ def plot_client_scaling(experiments, output_path):
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
     
-    # FID vs Number of Clients
     ax1.plot(labels, fid_scores, marker='D', markersize=10, linewidth=2.5,
              color='purple', markerfacecolor='cyan', markeredgewidth=2)
     ax1.set_xlabel('Number of Clients', fontsize=12, fontweight='bold')
@@ -302,8 +298,7 @@ def plot_client_scaling(experiments, output_path):
     for i, (x, y) in enumerate(zip(labels, fid_scores)):
         ax1.annotate(f'{y:.2f}', (i, y), textcoords="offset points",
                      xytext=(0,10), ha='center', fontsize=10, fontweight='bold')
-    
-    # IS vs Number of Clients
+            
     ax2.plot(labels, is_scores, marker='D', markersize=10, linewidth=2.5,
              color='darkred', markerfacecolor='pink', markeredgewidth=2)
     ax2.set_xlabel('Number of Clients', fontsize=12, fontweight='bold')
@@ -321,73 +316,6 @@ def plot_client_scaling(experiments, output_path):
     print(f"Saved: {output_path}")
 
 
-def generate_markdown_report(experiments, histories, output_path):
-    """Generate a markdown report with all results"""
-    with open(output_path, 'w') as f:
-        f.write("# Federated Learning GAN Experiments - Results Report\n\n")
-        f.write("## Experiment Summary\n\n")
-        
-        # Metrics table
-        f.write("### Performance Metrics\n\n")
-        f.write("| Experiment | FID Score ↓ | Inception Score ↑ | Samples |\n")
-        f.write("|------------|-------------|-------------------|----------|\n")
-        
-        for name in sorted(experiments.keys()):
-            data = experiments[name]
-            fid = data['fid_score']
-            is_mean = data['inception_score_mean']
-            is_std = data['inception_score_std']
-            samples = data['num_samples']
-            
-            f.write(f"| {name} | {fid:.4f} | {is_mean:.4f} ± {is_std:.4f} | {samples} |\n")
-        
-        f.write("\n")
-        
-        # Best performing models
-        f.write("## Best Performing Models\n\n")
-        
-        best_fid_name = min(experiments.items(), key=lambda x: x[1]['fid_score'])[0]
-        best_fid_score = experiments[best_fid_name]['fid_score']
-        f.write(f"**Best FID Score:** {best_fid_name} ({best_fid_score:.4f})\n\n")
-        
-        best_is_name = max(experiments.items(), key=lambda x: x[1]['inception_score_mean'])[0]
-        best_is_score = experiments[best_is_name]['inception_score_mean']
-        f.write(f"**Best Inception Score:** {best_is_name} ({best_is_score:.4f})\n\n")
-        
-        # Key findings
-        f.write("## Key Findings\n\n")
-        f.write("### 1. Centralized vs Federated\n\n")
-        
-        if 'e1_centralized' in experiments:
-            centralized_fid = experiments['e1_centralized']['fid_score']
-            f.write(f"- Centralized baseline FID: {centralized_fid:.4f}\n")
-            
-            fed_exps = {k: v for k, v in experiments.items() if k != 'e1_centralized'}
-            if fed_exps:
-                avg_fed_fid = np.mean([v['fid_score'] for v in fed_exps.values()])
-                gap = avg_fed_fid - centralized_fid
-                gap_pct = (gap / centralized_fid) * 100
-                f.write(f"- Average federated FID: {avg_fed_fid:.4f}\n")
-                f.write(f"- Performance gap: {gap:.4f} ({gap_pct:.2f}%)\n\n")
-        
-        f.write("### 2. Data Heterogeneity Impact\n\n")
-        f.write("Impact of non-IID data distribution on model performance.\n\n")
-        
-        f.write("### 3. Client Scalability\n\n")
-        f.write("How the number of participating clients affects convergence and quality.\n\n")
-        
-        # Conclusion
-        f.write("## Conclusion\n\n")
-        f.write("This report summarizes the results of federated learning experiments ")
-        f.write("for medical imaging GANs. The experiments demonstrate the trade-offs ")
-        f.write("between privacy-preserving distributed training and model performance.\n\n")
-        
-        f.write("---\n\n")
-        f.write(f"*Generated automatically from experiment results*\n")
-    
-    print(f"Saved: {output_path}")
-
-
 def main():
     parser = argparse.ArgumentParser(description="Plot comparison of federated learning experiments")
     parser.add_argument('--metrics_dir', type=str, default='results/metrics',
@@ -399,7 +327,6 @@ def main():
     
     args = parser.parse_args()
     
-    # Create output directory
     output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
     
@@ -407,7 +334,6 @@ def main():
     print("Loading experiment data...")
     print(f"{'='*80}\n")
     
-    # Load data
     experiments = load_experiment_metrics(args.metrics_dir)
     histories = load_training_history(args.results_dir)
     
@@ -433,24 +359,6 @@ def main():
     
     plot_heterogeneity_study(experiments, output_dir / 'heterogeneity_study.png')
     plot_client_scaling(experiments, output_dir / 'client_scaling.png')
-    
-    # Generate report
-    generate_markdown_report(experiments, histories, output_dir / 'results_report.md')
-    
-    print(f"\n{'='*80}")
-    print("All plots generated successfully!")
-    print(f"{'='*80}\n")
-    print(f"Plots saved to: {output_dir}/")
-    print("\nGenerated files:")
-    print(f"  - fid_comparison.png")
-    print(f"  - inception_comparison.png")
-    print(f"  - combined_metrics.png")
-    print(f"  - training_curves_all.png")
-    print(f"  - heterogeneity_study.png")
-    print(f"  - client_scaling.png")
-    print(f"  - results_report.md")
-    print()
-
 
 if __name__ == "__main__":
     main()

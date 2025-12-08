@@ -22,8 +22,6 @@ import json
 import argparse
 
 
-# Dataset Classes
-
 class PKLPairDataset(Dataset):
     """Dataset for loading preprocessed chest X-ray images from PKL files"""
     def __init__(self, root, labels=["NORMAL", "PNEUMONIA"]):
@@ -125,8 +123,6 @@ def g_hinge_loss(fake_logits):
     return -fake_logits.mean()
 
 
-# Federated Learning Components
-
 class FederatedServer:
     """
     Federated Learning Server
@@ -155,12 +151,10 @@ class FederatedServer:
         if not client_models:
             return
         
-        # Calculate weights based on number of samples if not provided
         if client_weights is None:
             total_samples = sum(num_samples for _, _, num_samples in client_models)
             client_weights = [num_samples / total_samples for _, _, num_samples in client_models]
         
-        # Aggregate Generator
         global_G_state = OrderedDict()
         for key in self.global_G.state_dict().keys():
             global_G_state[key] = sum(
@@ -169,7 +163,6 @@ class FederatedServer:
             )
         self.global_G.load_state_dict(global_G_state)
         
-        # Aggregate Discriminator
         global_D_state = OrderedDict()
         for key in self.global_D.state_dict().keys():
             global_D_state[key] = sum(
@@ -253,7 +246,7 @@ class FederatedClient:
                 batch_size = real.size(0)
                 total_samples += batch_size
                 
-                # Train Discriminator
+                # discriminator
                 self.d_opt.zero_grad(set_to_none=True)
                 z = torch.randn(batch_size, self.z_dim, device=self.device)
                 with torch.no_grad():
@@ -266,7 +259,7 @@ class FederatedClient:
                 self.d_opt.step()
                 d_losses.append(d_loss.item())
                 
-                # Train Generator
+                # generator
                 self.g_opt.zero_grad(set_to_none=True)
                 z = torch.randn(batch_size, self.z_dim, device=self.device)
                 fake = self.local_G(z, y)
@@ -316,13 +309,13 @@ def partition_dataset(dataset, num_clients, partition_type='iid', alpha=0.5):
     indices = list(range(num_samples))
     
     if partition_type == 'iid':
-        # IID: Random uniform partitioning
+        # iid: Random uniform partitioning
         np.random.shuffle(indices)
         client_indices = np.array_split(indices, num_clients)
         return [idx.tolist() for idx in client_indices]
     
     elif partition_type == 'non_iid':
-        # Non-IID: Use Dirichlet distribution for label skew
+        # non-iid: Use Dirichlet distribution for label skew
         labels = np.array([dataset[i][1] for i in indices])
         num_classes = len(np.unique(labels))
         
@@ -332,16 +325,13 @@ def partition_dataset(dataset, num_clients, partition_type='iid', alpha=0.5):
             idx_k = np.where(labels == k)[0]
             np.random.shuffle(idx_k)
             
-            # Sample proportions from Dirichlet
             proportions = np.random.dirichlet(np.repeat(alpha, num_clients))
             proportions = (np.cumsum(proportions) * len(idx_k)).astype(int)[:-1]
             
-            # Split indices according to proportions
             splits = np.split(idx_k, proportions)
             for i, split in enumerate(splits):
                 client_indices[i].extend(split.tolist())
         
-        # Shuffle within each client
         for i in range(num_clients):
             np.random.shuffle(client_indices[i])
         
@@ -349,9 +339,6 @@ def partition_dataset(dataset, num_clients, partition_type='iid', alpha=0.5):
     
     else:
         raise ValueError(f"Unknown partition type: {partition_type}")
-
-
-# Main Federated Learning Function
 
 def federated_learning(
     config_path="config.yaml",
@@ -366,17 +353,6 @@ def federated_learning(
 ):
     """
     Main federated learning training loop
-    
-    Args:
-        config_path: Path to config.yaml
-        num_clients: Number of federated clients (simulated hospitals)
-        num_rounds: Number of federated rounds
-        local_epochs: Local training epochs per round
-        batch_size: Batch size for training
-        partition_type: 'iid' or 'non_iid'
-        alpha: Dirichlet parameter for non-IID (lower = more skewed)
-        save_dir: Directory to save models and results
-        seed: Random seed
     """
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -444,23 +420,19 @@ def federated_learning(
         print(f"Round {round_num}/{num_rounds}")
         print(f"{'='*80}")
         
-        # Get current global model state
         global_G_state, global_D_state = server.get_global_models()
         
-        # Train each client
         client_updates = []
         round_metrics = []
         
         for client in clients:
             print(f"\nTraining Client {client.client_id}...")
             
-            # Setup local models with global weights
             client.setup_models(global_G_state, global_D_state)
             
-            # Local training
             G_state, D_state, num_samples, metrics = client.train_local_epochs(
                 local_epochs,
-                verbose=(round_num == 1)  # Show progress bar for first round
+                verbose=(round_num == 1)
             )
             
             client_updates.append((G_state, D_state, num_samples))
@@ -468,9 +440,8 @@ def federated_learning(
             
             avg_g = np.mean([m['g_loss'] for m in metrics])
             avg_d = np.mean([m['d_loss'] for m in metrics])
-            print(f"  Client {client.client_id}: Avg G Loss: {avg_g:.4f}, Avg D Loss: {avg_d:.4f}")
+            print(f"Client {client.client_id}: Avg G Loss: {avg_g:.4f}, Avg D Loss: {avg_d:.4f}")
         
-        # Aggregate models on server
         print(f"\nAggregating models from {len(client_updates)} clients...")
         server.aggregate_models(client_updates)
         
@@ -489,12 +460,10 @@ def federated_learning(
         history['avg_d_loss'].append(avg_d_loss)
         history['client_metrics'].append(round_metrics)
         
-        # Save models periodically
         if round_num % 2 == 0 or round_num == num_rounds:
             server.save_global_models(save_dir, round_num)
             print(f"  Saved global models to {save_dir}/")
     
-    # Save final models
     print(f"\n{'='*80}")
     print("Federated Learning Complete!")
     print(f"{'='*80}\n")
@@ -546,8 +515,6 @@ def plot_federated_training(history, save_dir):
     plt.close()
     print(f"\nTraining curves saved to {save_dir / 'federated_training_curves.png'}")
 
-
-# CLI
 
 def main():
     parser = argparse.ArgumentParser(
@@ -624,7 +591,5 @@ def main():
         seed=args.seed
     )
 
-
 if __name__ == "__main__":
     main()
-
